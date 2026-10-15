@@ -1,6 +1,6 @@
 # baito-pay-app
 
-バイト代計算アプリ（Google Apps Script のWebアプリ）の入口ページ。
+給与計算アプリ（Google Apps Script のWebアプリ）の入口ページ。
 iPhoneの「ホーム画面に追加」でアイコンを付けて全画面で開くためだけのページで、記録などのデータは入っていない。
 アプリのデータは PIN のログインで守っている。
 
