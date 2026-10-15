@@ -62,14 +62,21 @@
   const sheet = document.getElementById('share'), shareName = document.getElementById('shareName');
   let shareFile = null;
   window.addEventListener('message', (e) => {
-    let host = '';
-    try { host = new URL(e.origin).hostname; } catch (err) { return; }
-    if (!/\.googleusercontent\.com$/.test(host)) return;
     const d = e.data;
-    if (!d || d.type !== 'kyuyo-share-pdf' || !(d.bytes instanceof ArrayBuffer) || typeof d.name !== 'string') return;
-    shareFile = new File([d.bytes], d.name.replace(/[\\/:*?"<>|]/g, '_'), { type: 'application/pdf' });
+    if (!d || d.type !== 'kyuyo-share-pdf') return;
+    const reply = (ok, reason) => { try { e.source.postMessage({ type: 'kyuyo-share-ack', ok, reason }, e.origin); } catch (err) {} };
+    let host = '';
+    try { host = new URL(e.origin).hostname; } catch (err) {}
+    // 受け取るのはアプリ（Google のサーバーの画面）からだけ
+    if (!/(^|\.)googleusercontent\.com$/.test(host) && !/(^|\.)script\.google\.com$/.test(host)) return reply(false, '送り元 ' + e.origin);
+    const b = d.bytes;
+    const bytes = b instanceof ArrayBuffer || ArrayBuffer.isView(b) ? b : (Array.isArray(b) ? new Uint8Array(b) : null);
+    if (!bytes || typeof d.name !== 'string') return reply(false, '中身');
+    try { shareFile = new File([bytes], d.name.replace(/[\\/:*?"<>|]/g, '_'), { type: 'application/pdf' }); }
+    catch (err) { return reply(false, 'ファイル ' + err.message); }
     shareName.textContent = shareFile.name;
     sheet.hidden = false;
+    reply(true, '');
   });
   document.getElementById('shareGo').addEventListener('click', () => {
     if (!shareFile) return;
