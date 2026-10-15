@@ -24,21 +24,64 @@
     gap: 18px; background: var(--bg); color: var(--muted); font: 14px -apple-system, "Hiragino Sans", sans-serif; transition: opacity .3s; }
   .splash img { width: 96px; height: 96px; border-radius: 22px; }
   .splash.hide { opacity: 0; pointer-events: none; }
+  [hidden] { display: none !important; }
+  /* PDF の共有（アプリから PDF を受け取ったときに下から出す） */
+  .share { position: fixed; inset: 0; background: rgba(23,21,18,.35); display: flex; align-items: flex-end; z-index: 10; }
+  .share .box { width: 100%; background: #fff; border-radius: 16px 16px 0 0; padding: 18px 16px calc(18px + env(safe-area-inset-bottom, 0px));
+    display: flex; flex-direction: column; gap: 10px; font: 15px -apple-system, "Hiragino Sans", sans-serif; color: #1f1c16; }
+  .share .ttl { font-weight: 700; font-size: 17px; }
+  .share .name { color: #8a8375; font-size: 13px; overflow-wrap: anywhere; }
+  .share button { font: inherit; border-radius: 10px; padding: 15px; border: 1px solid rgba(55,53,47,.16); background: #fff; }
+  .share .go { background: #171512; border-color: #171512; color: #fff; font-weight: 700; font-size: 17px; }
 </style>
 </head>
 <body>
 <iframe id="app" title="給与計算" allow="clipboard-write; web-share"></iframe>
+<div class="share" id="share" hidden>
+  <div class="box">
+    <div class="ttl">PDFを共有</div>
+    <div class="name" id="shareName"></div>
+    <button class="go" id="shareGo" type="button">共有する（LINEなど）</button>
+    <button class="no" id="shareNo" type="button">やめる</button>
+  </div>
+</div>
 <div class="splash" id="splash">
   <img src="https://yuta26jp.github.io/baito-pay-app/apple-touch-icon.png" alt="">
   <div>読み込み中…</div>
 </div>
 <script>
   // 給与計算アプリ（Apps Script の Webアプリ・本番）
-  const APP_URL = 'https://script.google.com/macros/s/AKfycbz6Rx_bLDMvLb2fxjsIYLejywE-dzeHhUssUKJBRzT4pv3_Gh_cTsxMieLXjO9M5gsg/exec?env=prod';
+  const APP_URL = 'https://script.google.com/macros/s/AKfycbz6Rx_bLDMvLb2fxjsIYLejywE-dzeHhUssUKJBRzT4pv3_Gh_cTsxMieLXjO9M5gsg/exec?env=prod&embed=1';
   const app = document.getElementById('app'), splash = document.getElementById('splash');
   app.addEventListener('load', () => splash.classList.add('hide'));
   app.src = APP_URL;
   setTimeout(() => splash.classList.add('hide'), 8000); // 読み込みに時間がかかっても8秒で画面を出す
+
+  // 勤怠月報の PDF を共有する（アプリの中からは iPhone の共有画面を開けないので、このページで開く）。
+  // アプリ（Google のサーバーの画面）から PDF を受け取り、「共有する」を押したら名前付きの PDF だけを共有する
+  const sheet = document.getElementById('share'), shareName = document.getElementById('shareName');
+  let shareFile = null;
+  window.addEventListener('message', (e) => {
+    let host = '';
+    try { host = new URL(e.origin).hostname; } catch (err) { return; }
+    if (!/\.googleusercontent\.com$/.test(host)) return;
+    const d = e.data;
+    if (!d || d.type !== 'kyuyo-share-pdf' || !(d.bytes instanceof ArrayBuffer) || typeof d.name !== 'string') return;
+    shareFile = new File([d.bytes], d.name.replace(/[\\/:*?"<>|]/g, '_'), { type: 'application/pdf' });
+    shareName.textContent = shareFile.name;
+    sheet.hidden = false;
+  });
+  document.getElementById('shareGo').addEventListener('click', () => {
+    if (!shareFile) return;
+    if (navigator.canShare && navigator.canShare({ files: [shareFile] })) {
+      navigator.share({ files: [shareFile] }).then(() => { sheet.hidden = true; }).catch(() => {});
+    } else {
+      const a = document.createElement('a');   // 共有できないブラウザ（パソコンなど）は保存する
+      a.href = URL.createObjectURL(shareFile); a.download = shareFile.name; a.click();
+      sheet.hidden = true;
+    }
+  });
+  document.getElementById('shareNo').addEventListener('click', () => { sheet.hidden = true; });
 </script>
 </body>
 </html>
